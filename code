@@ -1,0 +1,113 @@
+using System;
+using System.Net.Http;
+using System.Text;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
+namespace GeminiApiConsoleApp
+{
+    class Program
+    {
+        //api keyi buraya yapistirin
+        private static readonly string apiKey = "";
+        static async Task Main(string[] args)
+        {
+            while (true)
+            {
+                Console.WriteLine("Merhaba, lütfen aşağıdaki dil modellerinden birini seçiniz.");
+                Console.WriteLine("1 - GEMINI 1.0 PRO");
+                Console.WriteLine("2 - GEMINI 1.5 PRO");
+                Console.WriteLine("3 - GEMINI 1.5 FLASH");
+                Console.WriteLine("4 - ÇIKIŞ YAP");
+                Console.Write("Kullanıcı: ");
+                var modelIndex = Console.ReadLine();
+
+                string modelName = modelIndex switch
+                {
+                    "1" => "gemini-1.0-pro",
+                    "2" => "gemini-1.5-pro",
+                    "3" => "gemini-1.5-flash",
+                    "4" => null,
+                    _ => null
+                };
+
+                if (modelName == null)
+                {
+                    if (modelIndex == "4")
+                    {
+                        Environment.Exit(0);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Hatalı seçim yaptınız. Lütfen geçerli bir seçenek girin.");
+                    }
+                    continue;
+                }
+
+                while (true)
+                {
+                    Console.Write("\nKullanıcı: ");
+                    var userMessage = Console.ReadLine();
+                    if (userMessage.ToLower() == "e")
+                    {
+                        break;
+                    }
+
+                    try
+                    {
+                        var response = await SendMessageAsync(modelName, userMessage);
+                        Console.WriteLine("\nBot: " + response);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Bir hata oluştu: " + ex.Message);
+                    }
+
+                    Console.WriteLine("Çıkmak için E'ye basın");
+                }
+            }
+        }
+
+        static async Task<string> SendMessageAsync(string modelName, string userMessage)
+        {
+            using (var client = new HttpClient())
+            {
+                var url = $"https://generativelanguage.googleapis.com/v1/models/{modelName}:generateContent?key={apiKey}";
+
+                var requestBody = new
+                {
+                    contents = new[]
+                    {
+                        new
+                        {
+                            parts = new[]
+                            {
+                                new { text = userMessage }
+                            }
+                        }
+                    }
+                };
+
+                var json = JsonConvert.SerializeObject(requestBody);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await client.PostAsync(url, content);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorResponse = await response.Content.ReadAsStringAsync();
+                    throw new Exception($"HTTP Error: {response.StatusCode} - {errorResponse}");
+                }
+
+                var responseBody = await response.Content.ReadAsStringAsync();
+
+                var jsonResponse = JObject.Parse(responseBody);
+                var text = jsonResponse["candidates"]?[0]?["content"]?["parts"]?[0]?["text"]?.ToString();
+
+                return text ?? "Yanıt alınamadı.";
+            }
+        }
+    }
+}
+//#neganwashere
